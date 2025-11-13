@@ -3,10 +3,16 @@ from __future__ import annotations
 import os
 from functools import lru_cache
 
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+psycopg://postgres:postgres@localhost/postgres")
+load_dotenv()
+
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    "postgresql+psycopg://postgres:postgres@localhost:5432/corp_guide",
+)
 
 
 @lru_cache
