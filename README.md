@@ -13,10 +13,14 @@ A estrutura foi criada para continuar o desenvolvimento citado no resumo técnic
 
 ## Configuração rápida
 
-1. Crie um virtualenv e instale dependências:
+1. Crie um virtualenv para cada máquina/ambiente e instale dependências:
    ```bash
+   python -m venv .venv
+   .\.venv\Scripts\activate  # Windows
+   source .venv/bin/activate # Linux/Mac
    pip install -r requirements.txt
    ```
+   > Ao abrir o projeto em outra máquina é necessário repetir esse passo, pois os pacotes instalados localmente não são compartilhados entre ambientes.
 2. Configure variáveis de ambiente:
    - `DATABASE_URL`: string SQLAlchemy, ex.: `postgresql+psycopg://user:pass@host/db`.
    - `OPENAI_API_KEY`: chave para gerar embeddings com `text-embedding-3-small`.

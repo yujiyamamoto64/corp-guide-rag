@@ -33,7 +33,7 @@ def replace_chunks(session: Session, document: Document, chunks_data: Iterable[d
                 chunk_index=chunk["chunk_index"],
                 chunk_text=chunk["chunk_text"],
                 embedding=chunk["embedding"],
-                metadata=chunk["metadata"],
+                metadata_json=chunk["metadata"],
             )
         )
 

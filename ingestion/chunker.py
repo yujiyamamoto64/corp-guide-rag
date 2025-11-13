@@ -79,6 +79,8 @@ def _split_sections(root: Tag, page: PageContent) -> Iterable[dict]:
                     "text": "\n\n".join(current["parts"]),
                     "depth": current["depth"],
                     "breadcrumbs": list(current["breadcrumbs"]),
+                    "url": current["url"],
+                    "domain": current["domain"],
                 }
                 current["parts"] = []
             text = node.get_text(strip=True)

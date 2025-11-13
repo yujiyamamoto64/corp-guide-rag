@@ -49,6 +49,12 @@ class Crawler:
                 logger.warning("Falha ao baixar %s: %s", url, exc)
                 continue
 
+            content_type = response.headers.get("Content-Type", "")
+            if "text/html" not in content_type:
+                logger.info("Ignorando %s (content-type: %s)", url, content_type)
+                visited.add(url)
+                continue
+
             visited.add(url)
             page = parse_page(url, response.text)
             yield page

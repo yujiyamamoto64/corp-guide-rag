@@ -60,7 +60,10 @@ def parse_page(url: str, html: str) -> PageContent:
 
 def _extract_links(root: Tag) -> Iterable[str]:
     for a in root.find_all("a", href=True):
-        yield a["href"]
+        href = a["href"].strip()
+        if not href or href.startswith(("#", "mailto:", "javascript:", "tel:")):
+            continue
+        yield href
 
 
 def _extract_headings(root: Tag) -> Iterable[HeadingNode]:

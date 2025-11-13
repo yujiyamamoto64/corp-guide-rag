@@ -2,17 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 
-from sqlalchemy import (
-    Column,
-    DateTime,
-    ForeignKey,
-    Integer,
-    JSON,
-    String,
-    Text,
-    UniqueConstraint,
-    create_engine,
-)
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker
 from pgvector.sqlalchemy import Vector
 
@@ -49,7 +39,7 @@ class Chunk(Base):
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     chunk_text: Mapped[str] = mapped_column(Text)
     embedding: Mapped[list[float]] = mapped_column(Vector(1536))
-    metadata: Mapped[dict] = mapped_column(JSON)
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSON)
 
     document: Mapped["Document"] = relationship("Document", back_populates="chunks")
 
@@ -58,6 +48,9 @@ class Chunk(Base):
 
 def create_tables() -> None:
     engine = get_engine()
+    with engine.connect() as conn:
+        conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        conn.commit()
     Base.metadata.create_all(engine)
 
 

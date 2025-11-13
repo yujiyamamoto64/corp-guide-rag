@@ -39,7 +39,7 @@ def ask_endpoint(payload: AskRequest, session: Session = Depends(get_db_session)
             {
                 "url": document.url,
                 "title": document.title,
-                "metadata": chunk.metadata,
+                "metadata": chunk.metadata_json,
                 "chunk": chunk.chunk_text,
             }
         )
