@@ -1,48 +1,90 @@
 # Corp Guide RAG
 
-Sistema base para rastrear portais internos, extrair conteúdo hierárquico e alimentar um pipeline RAG corporativo com PostgreSQL + pgvector.  
+Base para rastrear portais e guias internos, extrair conteúdo hierárquico e alimentar um pipeline RAG com PostgreSQL + pgvector e OpenAI.
 
-## Componentes
+## Visão geral do repositório
 
-- `crawler/`: download de páginas, limpeza e estruturação da hierarquia (menu, headings ou caminho da URL).
-- `ingestion/`: chunking inteligente, geração de embeddings e atualização de documentos com detecção por hash.
-- `db/`: conexão, modelos SQLAlchemy e queries auxiliares para PostgreSQL com pgvector.
-- `api/`: endpoints FastAPI `/ingest-url`, `/rebuild-domain` e `/ask`.
-- `main.py`: ponto de entrada FastAPI.
+| pasta | função |
+|-------|--------|
+| `crawler/` | download de páginas, limpeza do HTML, normalização de URLs e reconstrução de hierarquias. |
+| `ingestion/` | chunking, embeddings, persistência de documentos e lógica de detecção de mudanças. |
+| `db/` | conexão SQLAlchemy + pgvector e modelos/tarefas relacionadas ao banco PostgreSQL. |
+| `api/` | endpoints FastAPI (`/ingest-url`, `/rebuild-domain`, `/ask`, `/health`). |
+| `scripts/` | utilitários para subir o servidor, refazer domínios e perguntar ao RAG. |
 
 ## Configuração rápida
 
-1. Crie um virtualenv para cada máquina/ambiente e instale dependências:
-   ```bash
+1. **Virtualenv** em cada máquina:
+   ```powershell
    python -m venv .venv
-   .\.venv\Scripts\activate  # Windows
-   source .venv/bin/activate # Linux/Mac
+   .\.venv\Scripts\activate   # Windows
    pip install -r requirements.txt
    ```
-   > Ao abrir o projeto em outra máquina é necessário repetir esse passo, pois os pacotes instalados localmente não são compartilhados entre ambientes.
-2. Configure variáveis de ambiente:
-   - `DATABASE_URL`: string SQLAlchemy, ex.: `postgresql+psycopg://user:pass@host/db`.
-   - `OPENAI_API_KEY`: chave para gerar embeddings com `text-embedding-3-small`.
-3. Execute migrações iniciais criando tabelas (provisoriamente manual):
+2. **Variáveis de ambiente** (coloque no `.env`):
+   - `DATABASE_URL`: `postgresql+psycopg://user:pass@localhost:5432/corp_guide`
+   - `OPENAI_API_KEY`: chave para embeddings e respostas
+   - (opcional) `ASK_MODEL`: modelo usado no `/ask` (`gpt-4o-mini` por padrão)
+3. **Criar tabelas**:
    ```bash
    python -m db.models
    ```
-4. Rode o servidor:
+4. **Subir API**:
    ```powershell
-   .\scripts\start_api.ps1        # Abre um terminal com o uvicorn (porta padrão 8011)
+   .\scripts\start_api.ps1    # abre um terminal com uvicorn em 127.0.0.1:8011
    ```
-5. Faça perguntas pela CLI:
-   ```bash
-   python scripts/ask.py "como faço a migração do argo cd?"
-   # use --url para mudar host/porta
+5. **Fazer perguntas**:
+   ```powershell
+   python scripts/ask.py "como faço a migração para o argo cd?"
    ```
-6. Reprocessar todo o domínio quando precisar (crawler + embeddings):
-   ```bash
-   python scripts/rebuild_domain.py [URL_BASE_GUIDE]
+6. **Rebuild completo** (crawler + embeddings):
+   ```powershell
+   python scripts/rebuild_domain.py [URL]
    ```
 
-## Próximos passos sugeridos
+## Banco de dados (PostgreSQL + pgvector)
 
-- Implementar Playwright no crawler para páginas que renderizam via JS.
-- Integrar fila/worker para ingestões grandes.
-- Criar camada de migrações (Alembic) e testes automatizados.
+### Tabela `documents`
+- `id`: chave primária
+- `domain`: domínio do documento
+- `url`: única por documento
+- `title`: título limpo
+- `content`: texto sem HTML
+- `content_hash`: `sha256(content)` para detecção de mudanças
+- `last_update`: timestamp automático
+
+### Tabela `chunks`
+- `id`: chave primária
+- `document_id`: FK para `documents` (CASCADE delete)
+- `chunk_index`: ordem do chunk
+- `chunk_text`: markdown limpo
+- `embedding`: `Vector(1536)` (OpenAI `text-embedding-3-small`)
+- `metadata`: JSON (título, breadcrumbs, URL, domínio, etc.)
+
+Recrie o schema a qualquer momento com `python -m db.models`.
+
+## Endpoints FastAPI
+
+| Método/Rota | Descrição |
+|-------------|-----------|
+| `GET /health` | status básico do servidor |
+| `POST /ingest-url` | `{ "url": "..." }` – baixa a página, compara hash e salva chunks/embeddings |
+| `POST /rebuild-domain` | `{ "base_url": "..." }` – remove documentos do domínio e refaz todo o crawl/ingestão (execução bem demorada)|
+| `POST /ask` | `{ "question": "...", "top_k": 6 }` – consulta pgvector e pede ao LLM para responder com base nos chunks |
+
+### Exemplos
+
+```bash
+# Ingestão incremental
+curl -X POST http://127.0.0.1:8011/ingest-url \
+     -H "Content-Type: application/json" \
+     -d '{"url":"[URL]"}'
+
+# Rebuild completo
+curl -X POST http://127.0.0.1:8011/rebuild-domain \
+     -H "Content-Type: application/json" \
+     -d '{"base_url":"[URL]"}'
+
+# Pergunta usando o helper
+python scripts/ask.py "como faço a migração do argo cd?"
+```
+
