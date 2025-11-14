@@ -28,6 +28,7 @@ class RebuildResponse(BaseModel):
 def rebuild_domain_endpoint(
     payload: RebuildRequest, session: Session = Depends(get_db_session)
 ) -> RebuildResponse:
+    base_url = str(payload.base_url)
     domain = payload.base_url.host
     deleted = delete_domain(session, domain)
     session.commit()
@@ -36,7 +37,7 @@ def rebuild_domain_endpoint(
     pages_processed = 0
     total_chunks = 0
 
-    for page in crawler.crawl(payload.base_url):
+    for page in crawler.crawl(base_url):
         result = ingest_page(session, page)
         pages_processed += 1
         total_chunks += result.chunks

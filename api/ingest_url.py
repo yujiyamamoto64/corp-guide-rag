@@ -28,8 +28,9 @@ def ingest_url_endpoint(
     payload: IngestRequest, session: Session = Depends(get_db_session)
 ) -> IngestResponse:
     crawler = Crawler(CrawlerConfig(max_pages=1))
+    target_url = str(payload.url)
     try:
-        page = next(iter(crawler.crawl(payload.url)))
+        page = next(iter(crawler.crawl(target_url)))
     except StopIteration:
         raise HTTPException(status_code=404, detail="Conteúdo não encontrado")
 
