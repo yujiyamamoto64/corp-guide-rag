@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -7,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from api.dependencies import get_db_session
 from db.models import Chunk, Document
-from ingestion.embeddings import embed_texts
+from ingestion.embeddings import embed_texts, get_client
 
 router = APIRouter(prefix="/ask", tags=["ask"])
 
@@ -62,11 +64,46 @@ def _build_preview(text: str, limit: int = 280) -> str:
     return flattened[:limit] + ("..." if len(flattened) > limit else "")
 
 
+LLM_MODEL = os.getenv("ASK_MODEL", "gpt-4o-mini")
+
+
 def _assemble_answer(question: str, contexts: list[AskContext]) -> str:
     if not contexts:
         return f"Não encontrei contexto relevante para “{question}”."
-    lines = [f"Principais referências para “{question}”:"]  # context summary
-    for idx, ctx in enumerate(contexts, start=1):
-        title = ctx.title or "Documento sem título"
-        lines.append(f"{idx}. {title} ({ctx.url})")
-    return "\n".join(lines)
+    try:
+        return _llm_answer(question, contexts)
+    except Exception:
+        lines = [f"Principais referências para “{question}”:"]  # fallback
+        for idx, ctx in enumerate(contexts, start=1):
+            title = ctx.title or "Documento sem título"
+            lines.append(f"{idx}. {title} ({ctx.url})")
+        return "\n".join(lines)
+
+
+def _llm_answer(question: str, contexts: list[AskContext]) -> str:
+    summaries = []
+    for ctx in contexts:
+        title = ctx.title or ctx.url
+        preview = ctx.preview.replace("\n", " ")
+        summaries.append(f"{title}: {preview}")
+    context_block = "\n".join(summaries)
+    prompt = (
+        "Você é um assistente técnico que responde com base no contexto fornecido.\n"
+        "Contexto:\n"
+        f"{context_block}\n\n"
+        f"Pergunta: {question}\n"
+        "Responda em português, cite ferramentas e passos quando necessário e inclua um resumo curto."
+    )
+    client = get_client()
+    completion = client.chat.completions.create(
+        model=LLM_MODEL,
+        temperature=0.2,
+        max_tokens=300,
+        messages=[
+            {"role": "system", "content": "Responda somente com base no contexto fornecido."},
+            {"role": "user", "content": prompt},
+        ],
+    )
+    if completion.choices:
+        return completion.choices[0].message.content.strip()
+    raise RuntimeError("Resposta vazia do modelo.")
