@@ -16,7 +16,7 @@ router = APIRouter(prefix="/ask", tags=["ask"])
 
 class AskRequest(BaseModel):
     question: str = Field(..., min_length=4)
-    top_k: int = Field(default=5, ge=1, le=20)
+    top_k: int = Field(default=6, ge=1, le=20)
 
 
 class AskContext(BaseModel):
@@ -43,9 +43,13 @@ def ask_endpoint(payload: AskRequest, session: Session = Depends(get_db_session)
     )
 
     contexts: list[AskContext] = []
+    seen_previews: set[str] = set()
     for chunk, document in session.execute(stmt):
         metadata = chunk.metadata_json or {}
         preview = _build_preview(chunk.chunk_text)
+        if preview in seen_previews:
+            continue
+        seen_previews.add(preview)
         contexts.append(
             AskContext(
                 url=document.url,
@@ -59,7 +63,7 @@ def ask_endpoint(payload: AskRequest, session: Session = Depends(get_db_session)
     return AskResponse(question=payload.question, answer=answer, contexts=contexts)
 
 
-def _build_preview(text: str, limit: int = 280) -> str:
+def _build_preview(text: str, limit: int = 400) -> str:
     flattened = " ".join(text.split())
     return flattened[:limit] + ("..." if len(flattened) > limit else "")
 
@@ -89,16 +93,16 @@ def _llm_answer(question: str, contexts: list[AskContext]) -> str:
     context_block = "\n".join(summaries)
     prompt = (
         "Você é um assistente técnico que responde com base no contexto fornecido.\n"
-        "Contexto:\n"
+        "Contexto (inclua instruções práticas, arquivos e comandos mencionados):\n"
         f"{context_block}\n\n"
         f"Pergunta: {question}\n"
-        "Responda em português, cite ferramentas e passos quando necessário e inclua um resumo curto."
+        "Responda em português. Cite arquivos e etapas práticas sempre que aparecerem no contexto. Inclua um resumo curto e oriente como executar o passo a passo."
     )
     client = get_client()
     completion = client.chat.completions.create(
         model=LLM_MODEL,
         temperature=0.2,
-        max_tokens=300,
+        max_tokens=512,
         messages=[
             {"role": "system", "content": "Responda somente com base no contexto fornecido."},
             {"role": "user", "content": prompt},
