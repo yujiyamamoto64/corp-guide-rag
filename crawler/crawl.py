@@ -56,7 +56,8 @@ class Crawler:
                 continue
 
             visited.add(url)
-            page = parse_page(url, response.text)
+            html = self._decode_response(response)
+            page = parse_page(url, html)
             yield page
 
             for link in page.links:
@@ -68,6 +69,23 @@ class Crawler:
         response = self.session.get(url, timeout=self.config.timeout)
         response.raise_for_status()
         return response
+
+    def _decode_response(self, response: Response) -> str:
+        content = response.content
+        encodings = [
+            "utf-8",
+            response.encoding,
+            response.apparent_encoding,
+            "latin-1",
+        ]
+        for enc in encodings:
+            if not enc:
+                continue
+            try:
+                return content.decode(enc, errors="ignore")
+            except (LookupError, UnicodeDecodeError):
+                continue
+        return content.decode("utf-8", errors="ignore")
 
 
 def content_hash(content: str) -> str:

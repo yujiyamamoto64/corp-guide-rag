@@ -13,3 +13,4 @@ pgvector==0.2.5
 python-dotenv==1.0.1
 tiktoken==0.7.0
 pydantic==2.7.4
+ftfy==6.2.0

@@ -26,10 +26,12 @@ def save_document(
 
 
 def replace_chunks(session: Session, document: Document, chunks_data: Iterable[dict]) -> None:
-    document.chunks.clear()
-    for idx, chunk in enumerate(chunks_data):
-        document.chunks.append(
+    session.query(Chunk).filter(Chunk.document_id == document.id).delete()
+    session.flush()
+    for chunk in chunks_data:
+        session.add(
             Chunk(
+                document_id=document.id,
                 chunk_index=chunk["chunk_index"],
                 chunk_text=chunk["chunk_text"],
                 embedding=chunk["embedding"],

@@ -5,6 +5,7 @@ from typing import Iterable, List
 
 from bs4 import BeautifulSoup, Tag
 from markdownify import markdownify as html_to_md
+from ftfy import fix_text
 
 from crawler.clean_html import extract_main
 from ingestion.embeddings import count_tokens
@@ -29,7 +30,7 @@ def chunk_page(page: PageContent, max_tokens: int = 1000) -> List[Chunk]:
 
     chunks: List[Chunk] = []
     for idx, section in enumerate(sections):
-        text = section["text"].strip()
+        text = fix_text(section["text"].strip())
         if not text:
             continue
 
@@ -51,7 +52,7 @@ def chunk_page(page: PageContent, max_tokens: int = 1000) -> List[Chunk]:
 
 def _base_metadata(section: dict, chunk_index: int) -> dict:
     return {
-        "title": section["title"],
+        "title": fix_text(section["title"]),
         "depth": section["depth"],
         "breadcrumbs": section["breadcrumbs"],
         "chunk_index": chunk_index,
@@ -83,7 +84,7 @@ def _split_sections(root: Tag, page: PageContent) -> Iterable[dict]:
                     "domain": current["domain"],
                 }
                 current["parts"] = []
-            text = node.get_text(strip=True)
+            text = fix_text(node.get_text(strip=True))
             depth = int(node.name[1])
             hierarchy = hierarchy[: depth - 1]
             hierarchy.append(text)
@@ -98,7 +99,7 @@ def _split_sections(root: Tag, page: PageContent) -> Iterable[dict]:
             )
         else:
             markdown = html_to_md(str(node), strip=[])
-            current["parts"].append(markdown)
+            current["parts"].append(fix_text(markdown))
 
     if current["parts"]:
         yield {

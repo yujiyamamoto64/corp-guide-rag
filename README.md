@@ -1,7 +1,6 @@
 # Corp Guide RAG
 
 Sistema base para rastrear portais internos, extrair conteúdo hierárquico e alimentar um pipeline RAG corporativo com PostgreSQL + pgvector.  
-A estrutura foi criada para continuar o desenvolvimento citado no resumo técnico do chat.
 
 ## Componentes
 
@@ -29,8 +28,17 @@ A estrutura foi criada para continuar o desenvolvimento citado no resumo técnic
    python -m db.models
    ```
 4. Rode o servidor:
+   ```powershell
+   .\scripts\start_api.ps1        # Abre um terminal com o uvicorn (porta padrão 8011)
+   ```
+5. Faça perguntas pela CLI:
    ```bash
-   uvicorn main:app --reload
+   python scripts/ask.py "como faço a migração do argo cd?"
+   # use --url para mudar host/porta
+   ```
+6. Reprocessar todo o domínio quando precisar (crawler + embeddings):
+   ```bash
+   python scripts/rebuild_domain.py [URL_BASE_GUIDE]
    ```
 
 ## Próximos passos sugeridos

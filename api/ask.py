@@ -17,10 +17,17 @@ class AskRequest(BaseModel):
     top_k: int = Field(default=5, ge=1, le=20)
 
 
+class AskContext(BaseModel):
+    url: str
+    title: str | None = None
+    breadcrumbs: list[str] = []
+    preview: str
+
+
 class AskResponse(BaseModel):
     question: str
     answer: str
-    contexts: list[dict]
+    contexts: list[AskContext]
 
 
 @router.post("", response_model=AskResponse)
@@ -33,25 +40,33 @@ def ask_endpoint(payload: AskRequest, session: Session = Depends(get_db_session)
         .limit(payload.top_k)
     )
 
-    contexts = []
+    contexts: list[AskContext] = []
     for chunk, document in session.execute(stmt):
+        metadata = chunk.metadata_json or {}
+        preview = _build_preview(chunk.chunk_text)
         contexts.append(
-            {
-                "url": document.url,
-                "title": document.title,
-                "metadata": chunk.metadata_json,
-                "chunk": chunk.chunk_text,
-            }
+            AskContext(
+                url=document.url,
+                title=document.title or metadata.get("title"),
+                breadcrumbs=metadata.get("breadcrumbs", []),
+                preview=preview,
+            )
         )
 
     answer = _assemble_answer(payload.question, contexts)
     return AskResponse(question=payload.question, answer=answer, contexts=contexts)
 
 
-def _assemble_answer(question: str, contexts: list[dict]) -> str:
-    """
-    Placeholder simples que cola os chunks relevantes.
-    Pode ser substituído por uma chamada real ao LLM.
-    """
-    joined = "\n\n".join(f"- {ctx['chunk']}" for ctx in contexts)
-    return f"Pergunta: {question}\n\nContexto:\n{joined}"
+def _build_preview(text: str, limit: int = 280) -> str:
+    flattened = " ".join(text.split())
+    return flattened[:limit] + ("..." if len(flattened) > limit else "")
+
+
+def _assemble_answer(question: str, contexts: list[AskContext]) -> str:
+    if not contexts:
+        return f"Não encontrei contexto relevante para “{question}”."
+    lines = [f"Principais referências para “{question}”:"]  # context summary
+    for idx, ctx in enumerate(contexts, start=1):
+        title = ctx.title or "Documento sem título"
+        lines.append(f"{idx}. {title} ({ctx.url})")
+    return "\n".join(lines)
